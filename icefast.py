@@ -49,7 +49,7 @@ class Source:
         ret = "  SID: %d\n" % (self.sid)
         ret = ret + "  Source URL: %s\n" % (self.source_url)
         ret = ret + "  Host URL: %s\n" % (self.host_url)
-        ret = ret + "  Server Name: %s\n" % (self.server_name)
+        ret = ret + "  Server Name: %s" % (self.server_name)
 
         return ret
 
@@ -144,9 +144,17 @@ class Db:
         ret = None if one == None else Source(*one)
         return ret
 
-    def get_sources(self):
+    def get_sources(self, filt = None):
         curs = self.db.cursor()
-        sql = "SELECT sid, source_url, host_url, server_name FROM sources;"
+
+        if filt == None:
+            sql = "SELECT sid, source_url, host_url, server_name FROM sources;"
+        else:
+            sql = ("SELECT sid, source_url, host_url, server_name " + \
+                    "FROM sources WHERE sid LIKE '%%%s%%' " + \
+                    "OR source_url LIKE '%%%s%%' OR host_url LIKE '%%%s%%' " + \
+                    "OR server_name LIKE '%%%s%%';") % (filt, filt, filt, filt)
+
         curs.execute(sql)
         
         srcs = []
@@ -169,7 +177,7 @@ class Interp:
         self.cmds = {
             "add_source" : { "func" : self.cmd_add_source, 
                 "help" : "add_source <url>"},
-            "ls" : {"func" : self.cmd_ls, "help" : "ls"},
+            "ls" : {"func" : self.cmd_ls, "help" : "ls [filter]"},
             "pull" : {"func" : self.cmd_pull, "help" : "pull <url>"},
             "help" : {"func" : self.cmd_help, "help" : "help"},
             "play" : {"func" : self.cmd_play, "help" : "play <sid>"},
@@ -181,8 +189,8 @@ class Interp:
     def cmd_add_source(self, src_url, origin_url):
         pass
 
-    def cmd_ls(self):
-        sources = self.db.get_sources()
+    def cmd_ls(self, filt = None):
+        sources = self.db.get_sources(filt)
         for i in sources:
             print("%s\n" % str(i))
 
