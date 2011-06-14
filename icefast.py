@@ -34,11 +34,19 @@ max_streams = 256
 
 class Source:
     def __init__(self):
+        self.sid = None
         self.source_url = ""
         self.host_url = ""
         self.server_name = ""
 
+    def __init__(self, sid, source_url, host_url, server_name):
+        self.sid = sid
+        self.source_url = source_url
+        self.host_url = host_url
+        self.server_name = server_name
+
     def __str__(self):
+        ret = "  SID: %d\n" % (self.sid)
         ret = ret + "  Source URL: %s\n" % (self.source_url)
         ret = ret + "  Host URL: %s\n" % (self.host_url)
         ret = ret + "  Server Name: %s\n" % (self.server_name)
@@ -68,7 +76,6 @@ class SourceScraper:
         soup = BeautifulSoup.BeautifulSoup(xml)
         sources = soup('source', limit=max_streams)
 
-        sid = 0
         for s in sources:
 
             src = Source()
@@ -80,9 +87,7 @@ class SourceScraper:
                 pass
 
             src.host_url = self.host_url
-
             self.sources_l.append(src)
-            sid = sid + 1
 
     def connect(self):
 
@@ -114,9 +119,11 @@ class Db:
 
         self.db = sqlite3.connect("%s/%s" % (self.db_dir, self.db_file))
 
-        sql = "CREATE TABLE IF NOT EXISTS sources(sid INTEGER PRIMARY KEY, source_url " + \
-                "TEXT, host_url TEXT, server_name TEXT);"
-        self.db.execute(sql)
+        curs = self.db.cursor()
+        sql = "CREATE TABLE IF NOT EXISTS sources" + \
+            "(sid INTEGER PRIMARY KEY, source_url " + \
+            "TEXT, host_url TEXT, server_name TEXT);"
+        curs.execute(sql)
 
     def add_source(self, src):
         sql = "INSERT INTO sources (sid, source_url, host_url, server_name) " + \
@@ -127,16 +134,45 @@ class Db:
     def commit(self):
         self.db.commit();
 
+    def get_source(self, sid):
+        curs = self.db.cursor()
+        sql = "SELECT sid, source_url, host_url, server_name FROM sources " + \
+            "WHERE sid = %s;" % (sid)
+        curs.execute(sql);
+        one = curs.fetchone()
+
+        ret = None if one == None else Source(*one)
+        return ret
+
+    def get_sources(self):
+        curs = self.db.cursor()
+        sql = "SELECT sid, source_url, host_url, server_name FROM sources;"
+        curs.execute(sql)
+        
+        srcs = []
+        while (True):
+
+            s = curs.fetchone()
+            if s == None:
+                break
+
+            s_o = Source(*s)
+            srcs.append(s_o)
+
+        return srcs
+
 # command interpreter
 class Interp:
 
     def __init__(self):
         # these have to be per instance so that functors can be derived
         self.cmds = {
-            "add_source" : { "func" : self.cmd_add_source, "help" : "add_source <url>"},
-            "ls" : { "func" : self.cmd_ls, "help" : "ls"},
-            "pull" : { "func" : self.cmd_pull, "help" : "pull <url>"},
+            "add_source" : { "func" : self.cmd_add_source, 
+                "help" : "add_source <url>"},
+            "ls" : {"func" : self.cmd_ls, "help" : "ls"},
+            "pull" : {"func" : self.cmd_pull, "help" : "pull <url>"},
             "help" : {"func" : self.cmd_help, "help" : "help"},
+            "play" : {"func" : self.cmd_play, "help" : "play <sid>"},
         }
 
         self.db = Db()
@@ -146,15 +182,15 @@ class Interp:
         pass
 
     def cmd_ls(self):
-        pass
+        sources = self.db.get_sources()
+        for i in sources:
+            print("%s\n" % str(i))
 
     def cmd_pull(self, host_url):
-        i = 0
         scraper = SourceScraper(host_url)
         scraper.parse()
         for src in scraper.sources_l:
             self.db.add_source(src)
-            i = i + 1
         self.db.commit()
 
         print("Successully pulled %d sources!" % i)
@@ -164,6 +200,15 @@ class Interp:
         for (cmd, info) in self.cmds.items():
             print(info["help"])
         print("")
+
+    def cmd_play(self, sid):
+        src = self.db.get_source(sid)
+
+        if (src == None):
+            print("No source found")
+            return
+
+        os.system("mplayer -cache 512 %s" % (src.source_url))
 
     # interpret commands
     def interp(self):
@@ -182,14 +227,13 @@ class Interp:
             if not done:
                 cmd = user_line[0]
                 args = user_line[1:]
-                try:
-                    self.cmds[cmd]["func"](*args)
+                #try:
+                self.cmds[cmd]["func"](*args)
                 #except TypeError:
                 #    print("usage: %s" % self.cmds[cmd]["help"])
-                except KeyError:
-                    print("Parse error")
-                    self.cmd_help()
-
+                #except KeyError:
+                #    print("Parse error")
+                #    self.cmd_help()
 
             self.db.db.close()
 
