@@ -235,7 +235,7 @@ class Interp:
                 #    print("Parse error")
                 #    self.cmd_help()
 
-            self.db.db.close()
+        self.db.db.close()
 
 if __name__ == "__main__":
 
