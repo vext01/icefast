@@ -176,11 +176,14 @@ class Interp:
         # these have to be per instance so that functors can be derived
         self.cmds = {
             "add_source" : { "func" : self.cmd_add_source, 
-                "help" : "add_source <url>"},
-            "ls" : {"func" : self.cmd_ls, "help" : "ls [filter]"},
-            "pull" : {"func" : self.cmd_pull, "help" : "pull <url>"},
-            "help" : {"func" : self.cmd_help, "help" : "help"},
-            "play" : {"func" : self.cmd_play, "help" : "play <sid>"},
+                "help" : "add_source <url>", "args" : "1-1"},
+            "ls" : {"func" : self.cmd_ls, "help" : "ls [filter]",
+                "args" : "0-1"},
+            "pull" : {"func" : self.cmd_pull, "help" : "pull <url>",
+                "args" : "1-1"},
+            "help" : {"func" : self.cmd_help, "help" : "help", "args" : "0-0"},
+            "play" : {"func" : self.cmd_play, "help" : "play <sid>",
+                "args" : "1-1"},
         }
 
         self.db = Db()
@@ -235,13 +238,22 @@ class Interp:
             if not done:
                 cmd = user_line[0]
                 args = user_line[1:]
-                #try:
-                self.cmds[cmd]["func"](*args)
-                #except TypeError:
-                #    print("usage: %s" % self.cmds[cmd]["help"])
-                #except KeyError:
-                #    print("Parse error")
-                #    self.cmd_help()
+
+
+                cmd_rec = None
+                try:
+                    cmd_rec = self.cmds[cmd]
+                except KeyError:
+                    self.cmd_help()
+                    continue
+
+                (a_min, a_max) = cmd_rec["args"].split("-")
+
+                if (len(args) < int(a_min)) or (len(args) > int(a_max)):
+                    self.cmd_help()
+                    continue
+
+                cmd_rec["func"](*args)
 
         self.db.db.close()
 
@@ -250,8 +262,3 @@ if __name__ == "__main__":
     interp = Interp()
     interp.interp()
     print("\nbye!")
-    #r = open_connection()
-    #srcs = parse(r)
-
-    #for s in srcs:
-    #    print("%s\n" % s)
