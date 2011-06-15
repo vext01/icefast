@@ -280,6 +280,9 @@ class Interp:
             except EOFError:
                 done = True
 
+            if len(user_line) == 0:
+                continue
+
             if not done:
                 cmd = user_line[0]
                 args = user_line[1:]
