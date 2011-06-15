@@ -193,6 +193,7 @@ class Db:
 class Interp:
 
     def __init__(self):
+        self.mplayer = "mplayer -really-quiet -cache 512"
         # these have to be per instance so that functors can be derived
         self.cmds = {
             "add_source" : {
@@ -262,7 +263,7 @@ class Interp:
 
         print("Starting streaming, press 'q' to return to icefast\n")
         print(src)
-        os.system("mplayer -really-quiet -cache 512 %s" % (src.source_url))
+        os.system("%s %s" % (self.mplayer, src.source_url))
         print("")
 
     # interpret commands
