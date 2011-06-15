@@ -132,15 +132,36 @@ class Db:
     def commit(self):
         self.db.commit();
 
-    def get_source(self, sid):
+    def get_source(self, term):
         curs = self.db.cursor()
+        # XXX parameterise
+        # try term as an SID first
         sql = "SELECT sid, source_url, host_url, server_name FROM sources " + \
-            "WHERE sid = %s;" % (sid)
-        curs.execute(sql);
+            "WHERE sid = ?;"
+        curs.execute(sql, (term,))
         one = curs.fetchone()
 
-        ret = None if one == None else Source(*one)
-        return ret
+        if one != None:
+            return Source(*one)
+
+        # try as a search term
+        sql = "SELECT sid, source_url, host_url, server_name FROM sources " + \
+            "WHERE sid LIKE '%%' || ? || '%%' " + \
+            "OR source_url LIKE '%%' || ? || '%%' OR " + \
+            "host_url LIKE '%%' || ? || '%%' " + \
+            "OR server_name LIKE '%%' || ? || '%%';"
+        curs.execute(sql, (term, term, term, term));
+        one = curs.fetchone()
+
+        if one == None:
+            return None
+
+        two = curs.fetchone()
+        if two != None:
+            print(">1 match. Please refine")
+            return None
+
+        return Source(*one)
 
     def get_sources(self, filt = None):
         curs = self.db.cursor()
@@ -148,6 +169,7 @@ class Db:
         if filt == None:
             sql = "SELECT sid, source_url, host_url, server_name FROM sources;"
         else:
+            # XXX parameterise
             sql = ("SELECT sid, source_url, host_url, server_name " + \
                     "FROM sources WHERE sid LIKE '%%%s%%' " + \
                     "OR source_url LIKE '%%%s%%' OR host_url LIKE '%%%s%%' " + \
@@ -173,17 +195,30 @@ class Interp:
     def __init__(self):
         # these have to be per instance so that functors can be derived
         self.cmds = {
-            "add_source" : { "func" : self.cmd_add_source, 
-                "help" : "add_source <url>", "args" : "1-1"},
-            "ls" : {"func" : self.cmd_ls, "help" : "ls [filter]",
+            "add_source" : {
+                "func" : self.cmd_add_source, 
+                "help" : "add_source <url>",
+                "args" : "1-1"},
+            "ls" : {
+                "func" : self.cmd_ls,
+                "help" : "ls [filter]",
                 "args" : "0-1"},
-            "pull" : {"func" : self.cmd_pull, "help" : "pull <url>" + \
-                "\n  Eg. 'pull http://somehost:port/admin/stats.xml'",
+            "pull" : {
+                "func" : self.cmd_pull,
+                "help" : "pull <url>\n  " + \
+                  "Eg. 'pull http://somehost:port/admin/stats.xml'",
                 "args" : "1-1"},
-            "help" : {"func" : self.cmd_help, "help" : "help", "args" : "0-0"},
-            "play" : {"func" : self.cmd_play, "help" : "play <sid>",
+            "help" : {
+                "func" : self.cmd_help,
+                "help" : "help",
+                "args" : "0-0"},
+            "play" : {
+                "func" : self.cmd_play,
+                "help" : "play <sid | search term>",
                 "args" : "1-1"},
-            "clear" : {"func" : self.cmd_clear, "help" : "clear",
+            "clear" : {
+                "func" : self.cmd_clear,
+                "help" : "clear",
                 "args" : "0-0"},
         }
 
@@ -218,14 +253,17 @@ class Interp:
             print(info["help"])
         print("")
 
-    def cmd_play(self, sid):
-        src = self.db.get_source(sid)
+    def cmd_play(self, term):
+        src = self.db.get_source(term)
 
         if (src == None):
             print("No source found")
             return
 
-        os.system("mplayer -cache 512 %s" % (src.source_url))
+        print("Starting streaming, press 'q' to return to icefast\n")
+        print(src)
+        os.system("mplayer -really-quiet -cache 512 %s" % (src.source_url))
+        print("")
 
     # interpret commands
     def interp(self):
