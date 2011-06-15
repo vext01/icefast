@@ -33,13 +33,7 @@ max_streams = 256
 # call mplayer
 
 class Source:
-    def __init__(self):
-        self.sid = None
-        self.source_url = ""
-        self.host_url = ""
-        self.server_name = ""
-
-    def __init__(self, sid, source_url, host_url, server_name):
+    def __init__(self, sid = None, source_url = None, host_url = None, server_name = None):
         self.sid = sid
         self.source_url = source_url
         self.host_url = host_url
@@ -61,8 +55,7 @@ class SourceScraper:
     def __init__(self, url):
         self.sources_l = []
 
-        # XXX user should specify whole url actually
-        self.host_url = "%s/admin/stats.xml" % url
+        self.host_url = url
         if not self.host_url.startswith("http://"):
             self.host_url = "http://%s" % self.host_url
 
@@ -128,8 +121,13 @@ class Db:
     def add_source(self, src):
         sql = "INSERT INTO sources (sid, source_url, host_url, server_name) " + \
             "VALUES (NULL, ?, ?, ?);"
-        print(sql)
-        self.db.execute(sql, (src.source_url, src.host_url, src.server_name));
+        curs = self.db.cursor()
+        curs.execute(sql, (src.source_url, src.host_url, src.server_name));
+
+    def clear(self):
+        sql = "DELETE FROM sources;"
+        curs = self.db.cursor()
+        curs.execute(sql);
 
     def commit(self):
         self.db.commit();
@@ -179,11 +177,14 @@ class Interp:
                 "help" : "add_source <url>", "args" : "1-1"},
             "ls" : {"func" : self.cmd_ls, "help" : "ls [filter]",
                 "args" : "0-1"},
-            "pull" : {"func" : self.cmd_pull, "help" : "pull <url>",
+            "pull" : {"func" : self.cmd_pull, "help" : "pull <url>" + \
+                "\n  Eg. 'pull http://somehost:port/admin/stats.xml'",
                 "args" : "1-1"},
             "help" : {"func" : self.cmd_help, "help" : "help", "args" : "0-0"},
             "play" : {"func" : self.cmd_play, "help" : "play <sid>",
                 "args" : "1-1"},
+            "clear" : {"func" : self.cmd_clear, "help" : "clear",
+                "args" : "0-0"},
         }
 
         self.db = Db()
@@ -191,6 +192,9 @@ class Interp:
     # add the source url 'src_url' 
     def cmd_add_source(self, src_url, origin_url):
         pass
+
+    def cmd_clear(self):
+        self.db.clear()
 
     def cmd_ls(self, filt = None):
         sources = self.db.get_sources(filt)
@@ -200,8 +204,10 @@ class Interp:
     def cmd_pull(self, host_url):
         scraper = SourceScraper(host_url)
         scraper.parse()
+        i = 0
         for src in scraper.sources_l:
             self.db.add_source(src)
+            i = i + 1
         self.db.commit()
 
         print("Successully pulled %d sources!" % i)
