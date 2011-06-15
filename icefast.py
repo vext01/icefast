@@ -193,7 +193,7 @@ class Db:
 class Interp:
 
     def __init__(self):
-        self.mplayer = "mplayer -really-quiet -cache 512"
+        self.mplayer = "mplayer -cache 512"
         # these have to be per instance so that functors can be derived
         self.cmds = {
             "add_source" : {
